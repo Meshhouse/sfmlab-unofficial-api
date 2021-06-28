@@ -1,0 +1,7 @@
+# select image
+FROM node:14-alpine
+WORKDIR /usr/src/app
+
+# run application
+ENV NPM_CONFIG_LOGLEVEL error
+CMD ["sh", "-c", "npm install && npm run build && npm run start"]
