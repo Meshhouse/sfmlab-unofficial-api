@@ -284,7 +284,7 @@ async function getDownloadLinks(parser: cheerio.Root, gotInstance: any, cookieJa
   const linksArray: ModelLink[] = [];
 
   const linkInfo = parser('.content-container .main-upload table tbody tr td[data-file-id]');
-  const links = parser('.content-container .main-upload table tbody tr td[colspan="9"] a:first-of-type');
+  const links = parser('.content-container .main-upload table tbody tr td[colspan="9"] ul.download-set li.download-container:first-child a');
 
   try {
     for (let i = 0; i < links.length; i++) {
@@ -297,13 +297,13 @@ async function getDownloadLinks(parser: cheerio.Root, gotInstance: any, cookieJa
 
       const downloadLink = dom('.content-container .main-upload .project-description-div p:first-child a');
 
-      const filename = linkRow('td:first-child strong').text();
+      const title = linkRow('td:first-child strong').text();
       const fileSize = linkRow('td:last-child').text() || '';
 
       if (downloadLink !== null) {
         linksArray.push({
           url: downloadLink.attr('href') ?? '',
-          title: filename,
+          title,
           file_size: fileSize
         });
       }
@@ -311,7 +311,7 @@ async function getDownloadLinks(parser: cheerio.Root, gotInstance: any, cookieJa
     return linksArray;
   } catch (err) {
     console.error(err);
-    return new Error(err);
+    return new Error(String(err));
   }
 }
 
