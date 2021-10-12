@@ -20,10 +20,10 @@ export async function createThumbnail(database: string, id: string | number, url
   // Check for file exists
   try {
     await fs.access(filePath, constants.F_OK);
-    logger.info(`Thumbnail ${output} already exists`);
+    logger.info(`Thumbnail ${output} (${database}:${id}) already exists`);
     return Promise.resolve();
   } catch (error) {
-    logger.info(`Thumbnail ${output} not exists, creating`);
+    logger.info(`Thumbnail ${output} (${database}:${id}) not exists, creating`);
   }
 
   try {
