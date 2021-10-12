@@ -13,17 +13,23 @@ export async function createThumbnail(database: string, id: string | number, url
   try {
     await fs.access(dir, constants.F_OK);
   } catch (error) {
-    logger.info(`Folder ${dir} not exists, creating`);
+    if (process.env.VERBOSE === 'true') {
+      logger.info(`Folder ${dir} not exists, creating`);
+    }
     await fs.mkdir(dir, { recursive: true });
   }
 
   // Check for file exists
   try {
     await fs.access(filePath, constants.F_OK);
-    logger.info(`Thumbnail ${output} (${database}:${id}) already exists`);
+    if (process.env.VERBOSE === 'true') {
+      logger.info(`Thumbnail ${output} (${database}:${id}) already exists`);
+    }
     return Promise.resolve();
   } catch (error) {
-    logger.info(`Thumbnail ${output} (${database}:${id}) not exists, creating`);
+    if (process.env.VERBOSE === 'true') {
+      logger.info(`Thumbnail ${output} (${database}:${id}) not exists, creating`);
+    }
   }
 
   try {
