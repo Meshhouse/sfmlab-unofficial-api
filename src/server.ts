@@ -2,9 +2,11 @@ import fastify from 'fastify';
 import fastifyCors from 'fastify-cors';
 import fastifyCaching from 'fastify-caching';
 import fastifySensible from 'fastify-sensible';
+import fastifyStatic from 'fastify-static';
 import fastifyTypeORM from 'fastify-typeorm-plugin';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
+import path from 'path';
 import child_process from 'child_process';
 
 import * as routes from './routes';
@@ -35,6 +37,10 @@ void (async(): Promise<void> => {
   });
   void server.register(fastifyCaching, {
     privacy: 'private'
+  });
+  void server.register(fastifyStatic, {
+    root: path.normalize(`${__dirname}/../thumbnails/`),
+    prefix: '/thumbnails/'
   });
   void server.register(fastifyTypeORM, {
     type: 'sqlite',
