@@ -43,6 +43,7 @@ export async function createThumbnail(database: string, id: string | number, url
       .toFile(filePath);
   } catch (error) {
     logger.error(error as string);
-    process.exit(1);
+    logger.info('Skipping thumbnail creating');
+    return Promise.resolve();
   }
 }
