@@ -71,7 +71,7 @@ export async function getSingleModel(orm: ORMConnection, id: number): Promise<Sm
         const file = original.substring(original.lastIndexOf('/') + 1);
         const filename = file.substring(0, file.lastIndexOf('.'));
 
-        return `${process.env.DOMAIN_URL}/smutbase/${model.id}/${filename}.webp`;
+        return `${process.env.DOMAIN_URL}/thumbnails/smutbase/${model.id}/${filename}.webp`;
       });
 
 
