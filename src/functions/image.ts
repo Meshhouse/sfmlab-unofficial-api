@@ -49,7 +49,7 @@ export async function createThumbnail(database: string, id: string | number, url
       .toFile(filePath);
   } catch (error) {
     logger.error(error as string);
-    logger.info('Skipping thumbnail creating');
+    logger.info(`Skipping thumbnail ${output} (${database}:${id}) creating`);
     return Promise.resolve();
   }
 }
