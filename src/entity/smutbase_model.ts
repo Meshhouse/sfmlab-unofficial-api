@@ -37,6 +37,8 @@ export class SmutbaseModel {
   @Column('text')
   images!: string[] | string;
 
+  image_thumbs?: string[];
+
   @Column('text')
   links!: ModelLink[] | string;
 

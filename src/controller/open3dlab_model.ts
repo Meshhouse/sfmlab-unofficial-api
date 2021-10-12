@@ -10,6 +10,8 @@ import type { Connection as ORMConnection, FindManyOptions, FindConditions } fro
 import { Like } from 'typeorm';
 import logger from '../logger';
 import async from 'async';
+import { URL } from 'url';
+import { createThumbnail } from '../functions/image';
 
 export async function getModels(orm: ORMConnection, params: SFMLabGetModelsQuery): Promise<SFMLabResponse | Error> {
   const page: number = Number(params?.page) || 1;
@@ -63,9 +65,19 @@ export async function getSingleModel(orm: ORMConnection, id: number): Promise<Op
       .findOne({ id });
 
     if (model) {
+      let imagesThumbs = JSON.parse(model.images as string);
+      imagesThumbs = imagesThumbs.map((image: string) => {
+        const original = new URL(image).pathname;
+        const file = original.substring(original.lastIndexOf('/') + 1);
+        const filename = file.substring(0, file.lastIndexOf('.'));
+
+        return `${process.env.DOMAIN_URL}/open3dlab/${model.id}/${filename}.webp`;
+      });
+
       return {
         ...model,
         images: JSON.parse(model.images as string),
+        image_thumbs: imagesThumbs,
         links: JSON.parse(model.links as string),
         tags: JSON.parse(model.tags as string),
         commentaries: JSON.parse(model.commentaries as string)
@@ -144,6 +156,29 @@ export async function runParser(orm: ORMConnection, params?: SFMLabParserQuery):
     return response;
   } catch (err) {
     console.error(err);
+    return Promise.reject(err);
+  }
+}
+
+export async function createThumbnails(orm: ORMConnection): Promise<void | Error> {
+  try {
+    const models = await orm
+      .getRepository(Open3DLabModel)
+      .find();
+
+    for (const model of models) {
+      const images = JSON.parse(model.images as string);
+      for (const image of images) {
+        const original = new URL(image).pathname;
+        const file = original.substring(original.lastIndexOf('/') + 1);
+        const filename = file.substring(0, file.lastIndexOf('.'));
+
+        await createThumbnail('open3dlab', model.id, image, `${filename}.webp`);
+      }
+    }
+
+    return Promise.resolve();
+  } catch (err) {
     return Promise.reject(err);
   }
 }

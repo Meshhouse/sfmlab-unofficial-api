@@ -40,7 +40,7 @@ export async function runSFMLabParser(): Promise<void | Error> {
     return Promise.resolve();
   } catch (err) {
     logger.error('SFMLab parser task failed');
-    logger.error(err);
+    logger.error(err as string);
     return Promise.reject(err);
   }
 }
@@ -78,7 +78,7 @@ export async function runSmutbaseParser(): Promise<void | Error> {
     return Promise.resolve();
   } catch (err) {
     logger.error('Smutbase parser task failed');
-    logger.error(err);
+    logger.error(err as string);
     return Promise.reject(err);
   }
 }
@@ -116,7 +116,47 @@ export async function runOpen3DLabParser(): Promise<void | Error> {
     return Promise.resolve();
   } catch (err) {
     logger.error('Open3DLab parser task failed');
-    logger.error(err);
+    logger.error(err as string);
+    return Promise.reject(err);
+  }
+}
+
+export async function createThumbnails(): Promise<void | Error> {
+  const connection = await createConnection({
+    type: 'sqlite',
+    database: './database/sfmlab.sql',
+    synchronize: true,
+    logging: false,
+    entities: [
+      'dist/entity/**/*.js'
+    ],
+    migrations: [
+      'dist/migration/**/*.js'
+    ],
+    subscribers: [
+      'dist/subscriber/**/*.js'
+    ]
+  });
+
+  try {
+    process.title = 'Thumbnail creation';
+
+    const start = performance.now();
+    await SFMLabModelController.createThumbnails(connection);
+    await SmutbaseModelController.createThumbnails(connection);
+    await Open3DLabModelController.createThumbnails(connection);
+    const end = performance.now();
+
+    const duration = intervalToDuration({
+      start,
+      end
+    });
+    logger.info('Thumbnail creation task completed');
+    logger.info(`Task takes ${formatDuration(duration, { format: ['hours', 'minutes', 'seconds'] })}`);
+    return Promise.resolve();
+  } catch (err) {
+    logger.error('Thumbnail creation task failed');
+    logger.error(err as string);
     return Promise.reject(err);
   }
 }
