@@ -182,9 +182,10 @@ async function parseModelPage(model: SFMLabModel, type = 'sfmlab'): Promise<SFML
 
     const category = parser('.content-container .side-upload .panel__footer dl:nth-child(5) dd').text();
     const tagsBlock = parser('.taglist .tag a');
+    const alerts = parser('.content-container .main-upload .alert.alert-info strong');
     const matureContent = type === 'smutbase'
       ? true
-      : parser('.content-container .main-upload .alert.alert-info strong').text() === 'Adult content';
+      : alerts.text().includes('Adult content');
 
     let createdAt = parser('.content-container .side-upload .panel__footer dl:nth-child(1) dd').text();
     createdAt = parseDate(createdAt);
