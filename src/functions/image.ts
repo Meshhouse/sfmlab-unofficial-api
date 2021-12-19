@@ -4,6 +4,7 @@ import { constants } from 'fs';
 import got from 'got';
 import sharp from 'sharp';
 import logger from '../logger';
+import { URL } from 'url';
 
 export async function createThumbnail(database: string, id: string | number, url: string, output: string): Promise<void | Error> {
   const dir = path.normalize(`${__dirname}/../../thumbnails/${database}/${id}/`);
@@ -33,7 +34,14 @@ export async function createThumbnail(database: string, id: string | number, url
   }
 
   try {
-    const file = await got(url, {
+    let imageURL = url;
+    const urlParse = new URL(imageURL);
+
+    if (urlParse.hostname.includes('files.sfmlab.com')) {
+      imageURL = `${urlParse.origin}${urlParse.pathname}`;
+    }
+
+    const file = await got(imageURL, {
       responseType: 'buffer',
       resolveBodyOnly: true
     });
@@ -47,6 +55,7 @@ export async function createThumbnail(database: string, id: string | number, url
         force: true
       })
       .toFile(filePath);
+    logger.info(`Thumbnail ${output} (${database}:${id}) created`);
   } catch (error) {
     logger.error(error as string);
     logger.info(`Original URL: ${url}`);
