@@ -80,6 +80,13 @@ void (async(): Promise<void> => {
     }));
   });
 
+  cron.schedule('* 3 * * *', () => {
+    void child_process.exec('npm run thumbnail-create', ((err, std) => {
+      console.error(err);
+      console.log(std);
+    }));
+  });
+
   server.listen(port, host, (err, address) => {
     if(err) {
       console.error(err);
