@@ -49,6 +49,7 @@ export async function createThumbnail(database: string, id: string | number, url
       .toFile(filePath);
   } catch (error) {
     logger.error(error as string);
+    logger.info(`Original URL: ${url}`);
     logger.info(`Skipping thumbnail ${output} (${database}:${id}) creating`);
     return Promise.resolve();
   }
