@@ -2,9 +2,8 @@ import got, { Options } from 'got';
 import cheerio from 'cheerio';
 import tough from 'tough-cookie';
 import FormData from 'form-data';
-import { format, getUnixTime, isValid, parse } from 'date-fns';
+import { format, getUnixTime, isValid, parse, parseISO } from 'date-fns';
 import { CookieJar } from 'tough-cookie';
-import SanitizeHTML from 'sanitize-html';
 import { SFMLabModel } from '../entity/sfmlab_model';
 import logger from '../logger';
 
@@ -85,7 +84,46 @@ export async function SFMLabAuthenticate(): Promise<void | Error> {
 
     logger.info(`Authenticated on https://sfmlab.com as ${process.env.SFMLAB_LOGIN}`);
     return Promise.resolve();
-  } catch (err) {
+  } catch (err: any) {
+    logger.error(err.response);
+    return Promise.reject(err);
+  }
+}
+
+export async function getProjectsList(page: number, type = 'sfmlab'): Promise<any> {
+  try {
+    let instance = sfmlabGotInstance;
+    switch (type) {
+    case 'sfmlab': {
+      instance = sfmlabGotInstance;
+      break;
+    }
+    case 'smutbase': {
+      instance = smutbaseGotInstance;
+      break;
+    }
+    case 'open3dlab': {
+      instance = open3dlabGotInstance;
+      break;
+    }
+    }
+
+    const offset = (page - 1) * 24;
+
+    const response = await instance('api/projects/list/', {
+      searchParams: {
+        format: 'json',
+        limit: 24,
+        offset,
+        order_by: '-last_file_date',
+        adult_content: 'unknown',
+        furry_content: 'unknown'
+      },
+      responseType: 'json'
+    });
+
+    return Promise.resolve(response.body);
+  } catch (err: any) {
     logger.error(err.response);
     return Promise.reject(err);
   }
@@ -110,28 +148,24 @@ export async function sfmlabRequest(url: string, params: Options): Promise<any> 
 }
 
 
-export async function parseIndexPage(parser: cheerio.Root, type = 'sfmlab'): Promise<any> {
+export async function parseIndexPage(data: SFMLabV2SimpleModel[], type = 'sfmlab'): Promise<any> {
   try {
-    const body = parser('.content-container .entry-content .entry-list .entry');
     let models: SFMLabModel[] = [];
 
-    body.each((idx: number, element: cheerio.Element) => {
-      const body = cheerio.load(element);
-      const title = body('.entry__body .entry__title a')?.text() ?? '';
-      const link = body('.entry__body .entry__title a')?.attr('href');
-      const id = (link?.match(/\d+/) as string[])[0];
-      const image = body('.entry__heading a img')?.attr('src') ?? '';
+    data.map((model) => {
+      const createdAt = parseISO(model.published_date);
+      const updatedAt = parseISO(model.modified);
 
       models.push({
-        id: Number(id),
-        title,
-        author: '',
-        thumbnail: image,
+        id: model.pk,
+        title: model.title,
+        author: model.author.profile_name || model.author.username,
+        thumbnail: model.item_thumb,
         extension: '.sfm',
-        description: '',
-        mature_content: type === 'sfmlab' || type === 'open3dlab' ? false : true,
-        created_at: 0,
-        updated_at: 0,
+        description: model.description,
+        mature_content: model.adult_content,
+        created_at: Number(format(createdAt, 'T')),
+        updated_at: Number(format(updatedAt, 'T')),
         images: [],
         links: [],
         tags: [],
@@ -175,43 +209,15 @@ async function parseModelPage(model: SFMLabModel, type = 'sfmlab'): Promise<SFML
 
     const parser = cheerio.load(root.body);
 
-    const author = parser('.panel .panel__avatar-title span.username').attr('title') ?? '';
-    const description = parser('.content-container .main-upload .panel .panel__body').html() ?? '';
     const fileSize = parser('.content-container .main-upload table tbody tr:first-child td:last-child').text();
     const domImages = parser('.content-container .main-upload .text-center a picture.project-detail-image-main img');
 
     const category = parser('.content-container .side-upload .panel__footer dl:nth-child(5) dd').text();
     const tagsBlock = parser('.taglist .tag a');
-    const alerts = parser('.content-container .main-upload .alert.alert-info strong');
-    const matureContent = type === 'smutbase'
-      ? true
-      : alerts.text().includes('Adult content');
-
-    let createdAt = parser('.content-container .side-upload .panel__footer dl:nth-child(1) dd').text();
-    createdAt = parseDate(createdAt);
-
-    let updatedAt = parser('.content-container .side-upload .panel__footer dl:nth-child(3) dd').text();
-    updatedAt = parseDate(updatedAt);
-
-    let commentsRoot;
-
-    if (type === 'sfmlab') {
-      commentsRoot = cheerio.load((await sfmlabRequest(`project/${model.id}/comments`, {
-        cookieJar: sfmlabCookieJar
-      })).body);
-    }
-
-    if (type === 'smutbase') {
-      commentsRoot = cheerio.load((await smutbaseGotInstance(`project/${model.id}/comments`)).body);
-    }
-
-    if (type === 'open3dlab') {
-      commentsRoot = cheerio.load((await open3dlabGotInstance(`project/${model.id}/comments`)).body);
-    }
 
     const images: string[] = [];
     const downloadLinks = await getDownloadLinks(parser, sfmlabRequest, sfmlabCookieJar);
-    const commentaries = getComments(commentsRoot as cheerio.Root);
+    const commentaries = await parseComments(model, type);
 
     const tags: string[] = [];
 
@@ -258,17 +264,8 @@ async function parseModelPage(model: SFMLabModel, type = 'sfmlab'): Promise<SFML
     const updatedModel: SFMLabModel = {
       ...model,
       images: JSON.stringify(images),
-      author,
       extension: type !== 'sfmlab' ? extension : '.sfm',
       file_size: fileSize,
-      mature_content: matureContent,
-      created_at: Number(createdAt),
-      updated_at: Number(updatedAt),
-      description: SanitizeHTML(description, {
-        exclusiveFilter: ((frame) => {
-          return !frame.text.trim();
-        })
-      }),
       links: JSON.stringify(downloadLinks as ModelLink[]),
       tags: JSON.stringify(tags),
       commentaries: JSON.stringify(commentaries)
@@ -316,15 +313,6 @@ async function getDownloadLinks(parser: cheerio.Root, gotInstance: any, cookieJa
   }
 }
 
-export function calculateTotalPages(paginator: cheerio.Cheerio): number {
-  const activeLink: string = paginator.find('li.active a').html() ?? '';
-  const lastLink: string = paginator.find('li.last a').attr('href') ?? '';
-
-  return lastLink !== ''
-    ? Number(lastLink?.split('page=')[1])
-    : Number(activeLink);
-}
-
 function parseDate(timestamp: string): string {
   let ts = timestamp;
   let parsedDate = null;
@@ -361,53 +349,48 @@ function parseDate(timestamp: string): string {
   return date;
 }
 
-/**
- * Find all commentaries for model from custom elements root
- * @param container Custom element root
- */
-export function getComments(parser: cheerio.Root): Comment[] {
-  const comments = parser('.comments .comment');
-  const commentsArray: Comment[] = [];
-
-  for (let i = 0; i < comments.length; i++) {
-    const comment = comments.get()[i];
-    const commentBody = cheerio.load(comment);
-
-    const message = commentBody('.comment__body .comment__content .content').text() || '';
-
-    let postedDate = commentBody('.comment__meta .comment__meta-left').text();
-    const startIdx = postedDate.indexOf('posted on');
-    let endIdx = postedDate.lastIndexOf('m.');
-    if (endIdx === -1) {
-      endIdx = postedDate.lastIndexOf('noon');
-      endIdx += 4;
+async function parseComments(model: SFMLabModel, type = 'sfmlab'): Promise<Comment[]|Error> {
+  try {
+    let instance = sfmlabGotInstance;
+    switch (type) {
+    case 'sfmlab': {
+      instance = sfmlabGotInstance;
+      break;
     }
-    postedDate = postedDate.substr(startIdx, endIdx + 1);
-    postedDate = postedDate.trim();
-
-    if (postedDate.length > 50) {
-      postedDate = postedDate.substr(0, 50).trim();
+    case 'smutbase': {
+      instance = smutbaseGotInstance;
+      break;
     }
-    const date = parseDate(postedDate);
-
-    const avatarLink = commentBody('.comment__body .comment_avatar').get()[0].attribs['src'];
-    let username = commentBody('.comment__meta .comment__meta-left .username').text()
-    || commentBody('.comment__meta .comment__meta-left').text().split(' ')[0];
-
-    username = username.replace('\n', '').trim();
-    if (!username) {
-      const text = commentBody('.comment__meta .comment__meta-left').text();
-      const idx = text.indexOf('posted on');
-      username = text.substr(0, idx).replace('\n', '').trim();
+    case 'open3dlab': {
+      instance = open3dlabGotInstance;
+      break;
+    }
     }
 
-    commentsArray.push({
-      name: username,
-      avatar: avatarLink,
-      message: message,
-      date: Number(date)
+    const comments: Comment[] = [];
+
+    const response = await instance<any>(`comments/api/projectrepo-project/${model.id}/`, {
+      searchParams: {
+        format: 'json',
+        limit: 1000,
+        offset: 0,
+        order_by: '-submit_date'
+      },
+      responseType: 'json'
     });
-  }
 
-  return commentsArray;
+    response.body.results.map((result: any) => {
+      comments.push({
+        name: result.user_name,
+        avatar: `https://${result.user_avatar}`,
+        message: result.comment,
+        date: Number(parseDate(result.submit_date))
+      });
+    });
+
+    return comments;
+  } catch (err) {
+    logger.error(err.response);
+    return Promise.reject(err);
+  }
 }

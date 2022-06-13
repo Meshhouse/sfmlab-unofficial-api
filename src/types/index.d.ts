@@ -45,3 +45,27 @@ type SFMLabGetSingleModelParams = {
 type SFMLabParserQuery = {
   full_rescan?: boolean | string;
 }
+
+type SFMLabV2SimpleModel = {
+  pk: number;
+  title: string;
+  description: string;
+  author: {
+    pk: number;
+    user_id: number;
+    profile_name: string;
+    username: string;
+    verified_uploader: boolean;
+    staff: boolean;
+    paid_supporter: boolean;
+  }
+  created: string;
+  modified: string;
+  published_date: string;
+  last_file_date: string;
+  views: number;
+  popularity: number;
+  furry_content: boolean;
+  adult_content: boolean;
+  item_thumb: string;
+}

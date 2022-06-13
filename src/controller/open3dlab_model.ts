@@ -1,11 +1,9 @@
 import { Open3DLabModel } from '../entity/open3dlab_model';
 import {
-  sfmlabCookieJar,
-  open3dlabGotInstance,
-  parseIndexPage,
-  calculateTotalPages
+  getProjectsList,
+  parseIndexPage
 } from './sfmlab';
-import cheerio from 'cheerio';
+
 import type { Connection as ORMConnection, FindManyOptions, FindConditions } from 'typeorm';
 import { Like } from 'typeorm';
 import logger from '../logger';
@@ -104,16 +102,8 @@ async function batchInsertModels(orm: ORMConnection, models: Open3DLabModel[]): 
 
 export async function runParser(orm: ORMConnection, params?: SFMLabParserQuery): Promise<Open3DLabModel[] | Error> {
   try {
-    const root = await open3dlabGotInstance('', {
-      searchParams: {
-        order_by: '-created'
-      },
-      cookieJar: sfmlabCookieJar
-    });
-    const parser = cheerio.load(root.body);
-    const paginator = parser('.content-container .pagination');
-
-    const lastPage = calculateTotalPages(paginator);
+    const indexPage = await getProjectsList(1, 'open3dlab');
+    const lastPage = Math.ceil(indexPage.count / 24);
 
     let models: Open3DLabModel[] = [];
 
@@ -129,16 +119,9 @@ export async function runParser(orm: ORMConnection, params?: SFMLabParserQuery):
       await async.eachLimit(pagesArray, threadLimit, async(page) => {
         const searchPage = Number(page) + 1;
 
-        const response = await open3dlabGotInstance('', {
-          searchParams: {
-            order_by: '-created',
-            page: searchPage
-          },
-          cookieJar: sfmlabCookieJar
-        });
+        const response = await getProjectsList(searchPage, 'open3dlab');
+        const insertedModels = await parseIndexPage(response.results, 'open3dlab');
 
-        const parser = cheerio.load(response.body);
-        const insertedModels = await parseIndexPage(parser, 'open3dlab');
         logger.info(`Open3DLab parser - parsed page ${searchPage}/${lastPage}`);
         models = models.concat(insertedModels);
 
@@ -147,7 +130,7 @@ export async function runParser(orm: ORMConnection, params?: SFMLabParserQuery):
       });
     } else {
       logger.info('Open3DLab parser - parsing first page only');
-      models = await parseIndexPage(parser, 'open3dlab');
+      models = await parseIndexPage(indexPage.results, 'open3dlab');
     }
 
     const response = await batchInsertModels(orm, models);

@@ -1,11 +1,9 @@
 import { SFMLabModel } from '../entity/sfmlab_model';
 import {
-  sfmlabCookieJar,
-  sfmlabRequest,
-  parseIndexPage,
-  calculateTotalPages
+  getProjectsList,
+  parseIndexPage
 } from './sfmlab';
-import cheerio from 'cheerio';
+
 import type { Connection as ORMConnection, FindManyOptions, FindConditions } from 'typeorm';
 import { Like } from 'typeorm';
 import logger from '../logger';
@@ -120,16 +118,8 @@ async function batchInsertModels(orm: ORMConnection, models: SFMLabModel[]): Pro
 
 export async function runParser(orm: ORMConnection, params?: SFMLabParserQuery): Promise<SFMLabModel[] | Error> {
   try {
-    const root = await sfmlabRequest('', {
-      searchParams: {
-        order_by: '-created'
-      },
-      cookieJar: sfmlabCookieJar
-    });
-    const parser = cheerio.load(root.body);
-    const paginator = parser('.content-container .pagination');
-
-    const lastPage = calculateTotalPages(paginator);
+    const indexPage = await getProjectsList(1, 'sfmlab');
+    const lastPage = Math.ceil(indexPage.count / 24);
 
     let models: SFMLabModel[] = [];
 
@@ -145,16 +135,9 @@ export async function runParser(orm: ORMConnection, params?: SFMLabParserQuery):
       await async.eachLimit(pagesArray, threadLimit, async(page) => {
         const searchPage = Number(page) + 1;
 
-        const response = await sfmlabRequest('', {
-          searchParams: {
-            order_by: '-created',
-            page: searchPage
-          },
-          cookieJar: sfmlabCookieJar
-        });
+        const response = await getProjectsList(searchPage, 'sfmlab');
+        const insertedModels = await parseIndexPage(response.results, 'sfmlab');
 
-        const parser = cheerio.load(response.body);
-        const insertedModels = await parseIndexPage(parser);
         logger.info(`SFMLab parser - parsed page ${searchPage}/${lastPage}`);
         models = models.concat(insertedModels);
 
@@ -163,7 +146,7 @@ export async function runParser(orm: ORMConnection, params?: SFMLabParserQuery):
       });
     } else {
       logger.info('SFMLab parser - parsing first page only');
-      models = await parseIndexPage(parser);
+      models = await parseIndexPage(indexPage.results, 'sfmlab');
     }
 
     const response = await batchInsertModels(orm, models);

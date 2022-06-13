@@ -1,11 +1,9 @@
 import { SmutbaseModel } from '../entity/smutbase_model';
 import {
-  sfmlabCookieJar,
-  smutbaseGotInstance,
-  parseIndexPage,
-  calculateTotalPages
+  getProjectsList,
+  parseIndexPage
 } from './sfmlab';
-import cheerio from 'cheerio';
+
 import type { Connection as ORMConnection, FindManyOptions, FindConditions } from 'typeorm';
 import { Like } from 'typeorm';
 import logger from '../logger';
@@ -105,16 +103,8 @@ async function batchInsertModels(orm: ORMConnection, models: SmutbaseModel[]): P
 
 export async function runParser(orm: ORMConnection, params?: SFMLabParserQuery): Promise<SmutbaseModel[] | Error> {
   try {
-    const root = await smutbaseGotInstance('', {
-      searchParams: {
-        order_by: '-created'
-      },
-      cookieJar: sfmlabCookieJar
-    });
-    const parser = cheerio.load(root.body);
-    const paginator = parser('.content-container .pagination');
-
-    const lastPage = calculateTotalPages(paginator);
+    const indexPage = await getProjectsList(1, 'smutbase');
+    const lastPage = Math.ceil(indexPage.count / 24);
 
     let models: SmutbaseModel[] = [];
 
@@ -130,16 +120,9 @@ export async function runParser(orm: ORMConnection, params?: SFMLabParserQuery):
       await async.eachLimit(pagesArray, threadLimit, async(page) => {
         const searchPage = Number(page) + 1;
 
-        const response = await smutbaseGotInstance('', {
-          searchParams: {
-            order_by: '-created',
-            page: searchPage
-          },
-          cookieJar: sfmlabCookieJar
-        });
+        const response = await getProjectsList(searchPage, 'smutbase');
+        const insertedModels = await parseIndexPage(response.results, 'smutbase');
 
-        const parser = cheerio.load(response.body);
-        const insertedModels = await parseIndexPage(parser, 'smutbase');
         logger.info(`Smutbase parser - parsed page ${searchPage}/${lastPage}`);
         models = models.concat(insertedModels);
 
@@ -148,7 +131,7 @@ export async function runParser(orm: ORMConnection, params?: SFMLabParserQuery):
       });
     } else {
       logger.info('Smutbase parser - parsing first page only');
-      models = await parseIndexPage(parser, 'smutbase');
+      models = await parseIndexPage(indexPage.results, 'smutbase');
     }
 
     const response = await batchInsertModels(orm, models);
