@@ -10,7 +10,6 @@ import path from 'path';
 import child_process from 'child_process';
 
 import * as routes from './routes';
-import { SFMLabAuthenticate } from './controller/sfmlab';
 
 dotenv.config();
 
@@ -24,12 +23,7 @@ export const server = fastify({
   }
 });
 
-void (async(): Promise<void> => {
-  try {
-    await SFMLabAuthenticate();
-  } catch (err) {
-    process.exit(1);
-  }
+void ((): void => {
 
   void server.register(fastifySensible);
   void server.register(fastifyCors, {
@@ -60,10 +54,13 @@ void (async(): Promise<void> => {
 
   server.route(routes.SFMLabGetModels);
   server.route(routes.SFMLabGetSingleModel);
+  server.route(routes.SFMLabExportFeed);
   server.route(routes.SmutbaseGetModels);
   server.route(routes.SmutbaseGetSingleModel);
+  server.route(routes.SmutbaseExportFeed);
   server.route(routes.Open3DLabGetModels);
   server.route(routes.Open3DLabGetSingleModel);
+  server.route(routes.Open3DLabExportFeed);
 
   cron.schedule('59 23 * * *', () => {
     void child_process.exec('npm run rescan:sfmlab', ((err, std) => {

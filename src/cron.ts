@@ -23,9 +23,6 @@ export const server = fastify({
 });
 
 void (async(): Promise<void> => {
-  if (site === '--sfmlab') {
-    await SFMLabAuthenticate();
-  }
   void server.register(fastifyTypeORM, {
     type: 'sqlite',
     database: './database/sfmlab.sql',

@@ -166,3 +166,53 @@ export async function createThumbnails(orm: ORMConnection): Promise<void | Error
     return Promise.reject(err);
   }
 }
+
+export async function getFeed(orm: ORMConnection): Promise<any[] | Error> {
+  try {
+    const data = await orm
+      .getRepository(SmutbaseModel)
+      .find();
+
+    const models = data.map((model) => {
+      let format = '';
+      if (model.extension === '.sfm') {
+        format = 'source filmmaker';
+      }
+      if (model.extension === '.max') {
+        format = '3ds max';
+      }
+      if (model.extension === '.ma') {
+        format = 'maya';
+      }
+      if (model.extension === '.fbx') {
+        format = 'fbx';
+      }
+      if (model.extension === '.c4d') {
+        format = 'cinema 4d';
+      }
+      if (model.extension === '.blend') {
+        format = 'blender';
+      }
+      if (model.extension === '.xps') {
+        format = 'xps';
+      }
+
+
+      return {
+        id: `SMUTBASE-${model.id}`,
+        title: model.title,
+        thumbnail: model.thumbnail,
+        description: model.description,
+        formats: [format],
+        tags: typeof model.tags === 'string' ? JSON.parse(model.tags) : model.tags,
+        url: `https://smutba.se/projects/${model.id}`,
+        provider: 'smutbase',
+        mature_content: model.mature_content
+      };
+    });
+
+    return models;
+  } catch (err) {
+    return Promise.reject(err);
+  }
+}

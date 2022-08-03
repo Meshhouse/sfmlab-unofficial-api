@@ -65,6 +65,37 @@ export const SFMLabGetSingleModel: RouteOptions<
   }
 };
 /**
+ * /sfmlab/feed
+ */
+export const SFMLabExportFeed: RouteOptions<
+  RawServerBase,
+  RawRequestDefaultExpression,
+  RawReplyDefaultExpression,
+  {Body: SFMLabFeedParams},
+  ContextConfigDefault
+> = {
+  method: 'POST',
+  url: '/sfmlab/feed',
+  handler: async(request, reply): Promise<void> => {
+    try {
+      const params = request.body;
+
+      const user = process.env.FEED_USER;
+      const password = process.env.FEED_PASSWORD;
+
+      if (params?.user !== user || params?.password !== password) {
+        void reply.send(server.httpErrors.unauthorized('Invalid credentials'));
+      } else {
+        const fetch = await SFMLabModelController.getFeed(server.orm);
+
+        void reply.send(fetch);
+      }
+    } catch (err) {
+      void reply.send(server.httpErrors.badRequest(err));
+    }
+  }
+};
+/**
  * /smutbase/models
  */
 export const SmutbaseGetModels: RouteOptions<
@@ -116,6 +147,37 @@ export const SmutbaseGetSingleModel: RouteOptions<
   }
 };
 /**
+ * /smutbase/feed
+ */
+export const SmutbaseExportFeed: RouteOptions<
+  RawServerBase,
+  RawRequestDefaultExpression,
+  RawReplyDefaultExpression,
+  {Body: SFMLabFeedParams},
+  ContextConfigDefault
+> = {
+  method: 'POST',
+  url: '/smutbase/feed',
+  handler: async(request, reply): Promise<void> => {
+    try {
+      const params = request.body;
+
+      const user = process.env.FEED_USER;
+      const password = process.env.FEED_PASSWORD;
+
+      if (params?.user !== user || params?.password !== password) {
+        void reply.send(server.httpErrors.unauthorized('Invalid credentials'));
+      } else {
+        const fetch = await SmutbaseModelController.getFeed(server.orm);
+
+        void reply.send(fetch);
+      }
+    } catch (err) {
+      void reply.send(server.httpErrors.badRequest(err));
+    }
+  }
+};
+/**
  * /smutbase/models
  */
 export const Open3DLabGetModels: RouteOptions<
@@ -163,6 +225,37 @@ export const Open3DLabGetSingleModel: RouteOptions<
       } else {
         void reply.send(server.httpErrors.badRequest(err));
       }
+    }
+  }
+};
+/**
+ * /open3dlab/feed
+ */
+export const Open3DLabExportFeed: RouteOptions<
+  RawServerBase,
+  RawRequestDefaultExpression,
+  RawReplyDefaultExpression,
+  {Body: SFMLabFeedParams},
+  ContextConfigDefault
+> = {
+  method: 'POST',
+  url: '/open3dlab/feed',
+  handler: async(request, reply): Promise<void> => {
+    try {
+      const params = request.body;
+
+      const user = process.env.FEED_USER;
+      const password = process.env.FEED_PASSWORD;
+
+      if (params?.user !== user || params?.password !== password) {
+        void reply.send(server.httpErrors.unauthorized('Invalid credentials'));
+      } else {
+        const fetch = await Open3DLabModelController.getFeed(server.orm);
+
+        void reply.send(fetch);
+      }
+    } catch (err) {
+      void reply.send(server.httpErrors.badRequest(err));
     }
   }
 };

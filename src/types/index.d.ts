@@ -69,3 +69,8 @@ type SFMLabV2SimpleModel = {
   adult_content: boolean;
   item_thumb: string;
 }
+
+type SFMLabFeedParams = {
+  user: string;
+  password: string;
+}

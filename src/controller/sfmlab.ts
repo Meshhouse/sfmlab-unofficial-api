@@ -131,8 +131,8 @@ export async function getProjectsList(page: number, type = 'sfmlab'): Promise<an
 
 export async function sfmlabRequest(url: string, params: Options): Promise<any> {
   const siteCookies = await sfmlabCookieJar.getCookies('https://sfmlab.com');
-  const sessionCookie = siteCookies.find((cookie) => cookie.key === 'sessionid');
-  if (sessionCookie) {
+  // const sessionCookie = siteCookies.find((cookie) => cookie.key === 'sessionid');
+  /*if (sessionCookie) {
     const currentDate = getUnixTime(new Date());
     const expiresDate = getUnixTime(new Date(sessionCookie.expires));
 
@@ -142,7 +142,7 @@ export async function sfmlabRequest(url: string, params: Options): Promise<any> 
       await sfmlabCookieJar.removeAllCookies();
       await SFMLabAuthenticate();
     }
-  }
+  }*/
 
   return sfmlabGotInstance(url, params);
 }
@@ -212,22 +212,25 @@ async function parseModelPage(model: SFMLabModel, type = 'sfmlab'): Promise<SFML
     const fileSize = parser('.content-container .main-upload table tbody tr:first-child td:last-child').text();
     const domImages = parser('.content-container .main-upload .text-center a picture.project-detail-image-main img');
 
-    const category = parser('.content-container .side-upload .panel__footer dl:nth-child(5) dd').text();
-    const tagsBlock = parser('.taglist .tag a');
+    const tagsList = parser('project-tag-element');
 
     const images: string[] = [];
     const downloadLinks = await getDownloadLinks(parser, sfmlabRequest, sfmlabCookieJar);
     const commentaries = await parseComments(model, type);
 
     const tags: string[] = [];
+    const softwares: string[] = [];
 
     domImages.each((idx: number, element: cheerio.Element) => {
       images.push((element as any).attribs['src'] ?? '');
     });
 
-    tagsBlock.each((idx: number, element: cheerio.Element) => {
-      const title = (element as any).children[0].data.split('(')[0].trim();
-      tags.push(title);
+    tagsList.each((idx: number, element: cheerio.Element) => {
+      tags.push((element as any).attribs['name'] ?? '');
+
+      if ((element as any).attribs['type'] === 'software') {
+        softwares.push((element as any).attribs['name'] ?? '');
+      }
     });
 
     if (domImages.length === 0) {
@@ -236,30 +239,31 @@ async function parseModelPage(model: SFMLabModel, type = 'sfmlab'): Promise<SFML
     }
 
     let extension = '.blend';
+    softwares.map((val) => {
+      if (val.includes('blender')) {
+        extension = '.blend';
+      }
 
-    if (category.toLowerCase().includes('blender')) {
-      extension = '.blend';
-    }
+      if (val.includes('3ds max')) {
+        extension = '.max';
+      }
 
-    if (category.toLowerCase().includes('3ds max')) {
-      extension = '.max';
-    }
+      if (val.includes('cinema 4d')) {
+        extension = '.c4d';
+      }
 
-    if (category.toLowerCase().includes('cinema 4d')) {
-      extension = '.c4d';
-    }
+      if (val.includes('maya')) {
+        extension = '.ma';
+      }
 
-    if (category.toLowerCase().includes('maya')) {
-      extension = '.ma';
-    }
+      if (val.includes('fbx')) {
+        extension = '.fbx';
+      }
 
-    if (category.toLowerCase().includes('fbx')) {
-      extension = '.fbx';
-    }
-
-    if (category.toLowerCase().includes('xps')) {
-      extension = '.xps';
-    }
+      if (val.includes('xps')) {
+        extension = '.xps';
+      }
+    });
 
     const updatedModel: SFMLabModel = {
       ...model,
